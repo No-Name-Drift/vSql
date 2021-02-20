@@ -2,7 +2,7 @@ using CitizenFX.Core;
 using CitizenFX.Core.Native;
 using static CitizenFX.Core.Native.API;
 
-using MySqlConnector;
+using Npgsql;
 
 using System;
 using System.Collections.Concurrent;
@@ -21,10 +21,10 @@ namespace vSql
 
         private class DbConnection : IDisposable
         {
-            public readonly MySqlConnection Connection;
+            public readonly NpgsqlConnection Connection;
 
             public DbConnection(string connectionString)
-            { Connection = new MySqlConnection(connectionString); }
+            { Connection = new NpgsqlConnection(connectionString); }
 
             public void Dispose()
             { Connection.Close(); }
@@ -144,7 +144,7 @@ namespace vSql
                         foreach (var parameter in parameters ?? Enumerable.Empty<KeyValuePair<string, object>>())
                             command.Parameters.AddWithValue(parameter.Key, parameter.Value);
 
-                        using (var transaction = await db.Connection.BeginTransactionAsync())
+                        using (var transaction = db.Connection.BeginTransaction())
                         {
                             command.Transaction = transaction;
 
@@ -234,7 +234,7 @@ namespace vSql
             return result;
         }
 
-        private static void BuildCommand(MySqlCommand command, string query, IDictionary<string, object> parameters)
+        private static void BuildCommand(NpgsqlCommand command, string query, IDictionary<string, object> parameters)
         {
             command.CommandText = query;
 
