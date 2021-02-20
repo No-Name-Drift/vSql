@@ -1,7 +1,8 @@
 using CitizenFX.Core;
 using CitizenFX.Core.Native;
+using static CitizenFX.Core.Native.API;
 
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 
 using System;
 using System.Collections.Concurrent;
@@ -16,6 +17,7 @@ namespace vSql
         private static ConcurrentQueue<Action> callbackQueue;
         private static string connectionString;
         private static bool wasInit;
+        private static Task completedTask = Task.FromResult(false);
 
         private class DbConnection : IDisposable
         {
@@ -32,8 +34,6 @@ namespace vSql
         {
             callbackQueue = new ConcurrentQueue<Action>();
 
-            Tick += OnTick;
-
             Exports.Add("ready", new Action<CallbackDelegate>((callback) =>
             {
                 Init();
@@ -41,6 +41,7 @@ namespace vSql
                 if (callback != null)
                 {
                     callbackQueue.Enqueue(() => callback.Invoke());
+                    ScheduleTick();
                 }
             }));
 
@@ -53,6 +54,7 @@ namespace vSql
                 if (callback != null)
                 {
                     callbackQueue.Enqueue(() => callback.Invoke(numberOfUpdatedRows));
+                    ScheduleTick();
                 }
             }));
 
@@ -65,6 +67,7 @@ namespace vSql
                 if (callback != null)
                 {
                     callbackQueue.Enqueue(() => callback.Invoke(isSucceed));
+                    ScheduleTick();
                 }
             }));
 
@@ -77,6 +80,7 @@ namespace vSql
                 if (callback != null)
                 {
                     callbackQueue.Enqueue(() => callback.Invoke(result));
+                    ScheduleTick();
                 }
             }));
 
@@ -89,12 +93,18 @@ namespace vSql
                 if (callback != null)
                 {
                     callbackQueue.Enqueue(() => callback.Invoke(result));
+                    ScheduleTick();
                 }
             }));
         }
 
         private static void PrintException(Exception ex)
         { CitizenFX.Core.Debug.Write("^4[" + DateTime.Now + "] ^2[vSql] ^1[Error] " + ex.Message + "\n"); }
+
+        private static void ScheduleTick()
+        {
+            ScheduleResourceTick("vSql");
+        }
 
         private static async Task<int> ExecuteAsync(string query, IDictionary<string, object> parameters)
         {
@@ -241,12 +251,13 @@ namespace vSql
             wasInit = true;
         }
 
+        [Tick]
         private static Task OnTick()
         {
             while (callbackQueue.TryDequeue(out Action action))
                 action.Invoke();
 
-            return null;
+            return completedTask;
         }
     }
 }
